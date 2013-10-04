@@ -46,28 +46,34 @@ public class MicrophoneAnalyzer {
         stopCapture = true;
         while (!threadEnded) {
             try {
-                Thread.sleep(50);
-            } catch (InterruptedException e) { }
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                // no biggie
+            }
         }
     }
 
 
     private float calculateRMSLevel(byte[] audioData) {
         // audioData might be buffered data read from a data line
-        long lSum = 0;
-        for(int i = 0; i < audioData.length; i++) {
-            lSum = lSum + audioData[i];
+        long sum = 0;
+        for (byte aud : audioData) {
+            sum += aud;
         }
 
-        double dAvg = lSum / audioData.length;
+        double average = sum / audioData.length;
 
-        double sumMeanSquare = 0d;
-        for(int j = 0; j < audioData.length; j++) {
-            sumMeanSquare = sumMeanSquare + Math.pow(audioData[j] - dAvg, 2d);
+        double sumMeanSquare = 0;
+        for (byte aud : audioData) {
+            sumMeanSquare = sumMeanSquare + Math.pow(aud - average, 2);
         }
 
         double averageMeanSquare = sumMeanSquare / audioData.length;
-        return (float)(Math.pow(averageMeanSquare, 0.5) + 0.5);
+        return (float)(Math.pow(averageMeanSquare, .5) + .5);
+    }
+
+    public void stop() {
+        killExistingThread();
     }
 
 
@@ -81,8 +87,8 @@ public class MicrophoneAnalyzer {
             stopCapture = false;
             try{
                 while(!stopCapture) {
-                    int cnt = microphone.read(tempBuffer, 0, tempBuffer.length);
-                    if(cnt > 0){
+                    int bytesRead = microphone.read(tempBuffer, 0, tempBuffer.length);
+                    if(bytesRead > 0){
                         float currentLevel = calculateRMSLevel(tempBuffer);
                         for (AmplitudeUpdateListener aul: listeners) {
                             aul.amplitudeUpdated(currentLevel);

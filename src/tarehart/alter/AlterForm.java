@@ -9,15 +9,21 @@ import java.awt.*;
 import java.awt.event.*;
 import java.net.URL;
 import java.util.List;
+import java.util.prefs.Preferences;
 
 
 public class AlterForm {
 
-    public static final int MAX_VOLUME = 50;
-    public static final int GRACE_PERIOD = 1000; // 1000 milliseconds = 1 second
+    private static final int MAX_VOLUME = 400;
+    private static final int GRACE_PERIOD = 1000; // 1000 milliseconds = 1 second
+    private static final int DEFAULT_THRESHOLD = 50;
+    private static final String CONFIG_THRESHOLD = "threshold";
+    private static final String CONFIG_KEY_CODE = "keyCode";
+    private static final String CONFIG_MIC_CHOICE = "microphoneChoice";
     private TalkingJudge judge;
     private KeyPresser presser;
     private MicrophoneAnalyzer microphoneAnalyzer;
+    protected Preferences preferences = Preferences.userNodeForPackage(AlterForm.class);
 
     public AlterForm() throws AWTException {
 
@@ -34,12 +40,12 @@ public class AlterForm {
         progressBar1.setMaximum(MAX_VOLUME);
         slider1.setMaximum(MAX_VOLUME);
 
-        slider1.setValue(3);
+        readFromPreferences();
 
         microphoneAnalyzer.addListener(new AmplitudeUpdateListener() {
             @Override
             public void amplitudeUpdated(float newAmplitude) {
-                int level = (int) newAmplitude;
+                int level = (int) newAmplitude * 10; // multiply by 10 so we get finer config with an int
                 progressBar1.setValue(level);
                 if (level >= slider1.getValue()) {
                     judge.gainSound();
@@ -62,6 +68,20 @@ public class AlterForm {
             }
         });
 
+    }
+
+    private void readFromPreferences() {
+
+        slider1.setValue(preferences.getInt(CONFIG_THRESHOLD, DEFAULT_THRESHOLD));
+        spinner1.setValue(preferences.getInt(CONFIG_KEY_CODE, KeyEvent.VK_ALT));
+        comboBox1.setSelectedIndex(preferences.getInt(CONFIG_MIC_CHOICE, 0));
+
+    }
+
+    private void savePreferences() {
+        preferences.putInt(CONFIG_KEY_CODE, (Integer) spinner1.getValue());
+        preferences.putInt(CONFIG_THRESHOLD, slider1.getValue());
+        preferences.putInt(CONFIG_MIC_CHOICE, comboBox1.getSelectedIndex());
     }
 
     private void setupKeyBinder() {
@@ -90,9 +110,9 @@ public class AlterForm {
         }
 
         try {
-            microphoneAnalyzer.setMixer((Mixer.Info) comboBox1.getItemAt(0));
+            microphoneAnalyzer.setMixer(comboBox1.getItemAt(0));
         } catch (LineUnavailableException e) {
-            e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+            e.printStackTrace();
         }
 
         comboBox1.addItemListener(new ItemListener() {
@@ -110,6 +130,40 @@ public class AlterForm {
         });
     }
 
+
+    private WindowListener getWindowListener() {
+        return new WindowListener() {
+            @Override
+            public void windowOpened(WindowEvent e) { }
+
+            @Override
+            public void windowClosing(WindowEvent e) {
+
+                microphoneAnalyzer.stop();
+                presser.release();
+
+                savePreferences();
+            }
+
+            @Override
+            public void windowClosed(WindowEvent e) { }
+
+            @Override
+            public void windowIconified(WindowEvent e) { }
+
+            @Override
+            public void windowDeiconified(WindowEvent e) { }
+
+            @Override
+            public void windowActivated(WindowEvent e) { }
+
+            @Override
+            public void windowDeactivated(WindowEvent e) { }
+        };
+    }
+
+
+
     public static void main(String[] args) {
 
         try {
@@ -125,12 +179,13 @@ public class AlterForm {
         try {
             AlterForm m = new AlterForm();
             frame.setContentPane(m.rootPanel);
-            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            frame.addWindowListener(m.getWindowListener());
+            frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
             frame.pack();
             frame.setLocationRelativeTo(null);
             frame.setVisible(true);
         } catch (AWTException e) {
-            e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+            e.printStackTrace();
         }
 
 
@@ -142,6 +197,6 @@ public class AlterForm {
     private JButton button1;
     private JSpinner spinner1;
     private JPanel statusLight;
-    private JComboBox comboBox1;
+    private JComboBox<Mixer.Info> comboBox1;
     private JTextPane thisAppWillTakeTextPane;
 }
