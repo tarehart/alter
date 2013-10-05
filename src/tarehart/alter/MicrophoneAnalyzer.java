@@ -80,7 +80,7 @@ public class MicrophoneAnalyzer {
     class CaptureThread extends Thread{
 
         //An arbitrary-size temporary holding buffer
-        byte tempBuffer[] = new byte[100];
+        byte tempBuffer[] = new byte[250];
         public void run(){
 
             threadEnded = false;
@@ -94,13 +94,14 @@ public class MicrophoneAnalyzer {
                             aul.amplitudeUpdated(currentLevel);
                         }
                     }
+
                 }
 
                 microphone.close();
                 threadEnded = true;
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 System.out.println(e);
-                System.exit(0);
+                System.exit(-1);
             }
         }
     }

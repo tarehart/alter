@@ -11,7 +11,7 @@ public class TalkingJudge {
     private KeyPresser presser;
     private Timer timer;
 
-    public TalkingJudge(KeyPresser presser, int gracePeriod) throws AWTException {
+    public TalkingJudge(KeyPresser presser, int gracePeriod) {
         this.gracePeriod = gracePeriod;
         this.presser = presser;
 

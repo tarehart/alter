@@ -15,7 +15,7 @@ import java.util.prefs.Preferences;
 public class AlterForm {
 
     private static final int MAX_VOLUME = 400;
-    private static final int GRACE_PERIOD = 1000; // 1000 milliseconds = 1 second
+    private static final int GRACE_PERIOD = 500; // 1000 milliseconds = 1 second
     private static final int DEFAULT_THRESHOLD = 50;
     private static final String CONFIG_THRESHOLD = "threshold";
     private static final String CONFIG_KEY_CODE = "keyCode";
@@ -27,20 +27,21 @@ public class AlterForm {
 
     public AlterForm() throws AWTException {
 
-        microphoneAnalyzer = new MicrophoneAnalyzer();
-        setupMicrophones();
+        populateMicrophoneCombo();
 
+        microphoneAnalyzer = new MicrophoneAnalyzer();
         presser = new KeyPresser();
         judge = new TalkingJudge(presser, GRACE_PERIOD);
-        presser.setKey(KeyEvent.VK_ALT);
-        spinner1.setValue(KeyEvent.VK_ALT);
-
-        setupKeyBinder();
 
         progressBar1.setMaximum(MAX_VOLUME);
         slider1.setMaximum(MAX_VOLUME);
 
-        readFromPreferences();
+        setUIFromPreferences();
+
+        setMicrophoneFromUI();
+        setKeyFromUI();
+
+        addUIListeners();
 
         microphoneAnalyzer.addListener(new AmplitudeUpdateListener() {
             @Override
@@ -60,17 +61,46 @@ public class AlterForm {
             }
         });
 
+    }
 
+    private void addUIListeners() {
         spinner1.addChangeListener(new ChangeListener() {
             @Override
             public void stateChanged(ChangeEvent e) {
-                presser.setKey((Integer) spinner1.getValue());
+                setKeyFromUI();
             }
         });
 
+        comboBox1.addItemListener(new ItemListener() {
+            @Override
+            public void itemStateChanged(ItemEvent e) {
+                if (e.getStateChange() == ItemEvent.SELECTED) {
+                    setMicrophoneFromUI();
+                }
+            }
+        });
+
+        button1.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                KeyGrabber.grabNextKey(spinner1);
+            }
+        });
     }
 
-    private void readFromPreferences() {
+    private void setKeyFromUI() {
+        presser.setKey((Integer) spinner1.getValue());
+    }
+
+    private void setMicrophoneFromUI() {
+        try {
+            microphoneAnalyzer.setMixer((Mixer.Info) comboBox1.getSelectedItem());
+        } catch (LineUnavailableException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void setUIFromPreferences() {
 
         slider1.setValue(preferences.getInt(CONFIG_THRESHOLD, DEFAULT_THRESHOLD));
         spinner1.setValue(preferences.getInt(CONFIG_KEY_CODE, KeyEvent.VK_ALT));
@@ -84,16 +114,7 @@ public class AlterForm {
         preferences.putInt(CONFIG_MIC_CHOICE, comboBox1.getSelectedIndex());
     }
 
-    private void setupKeyBinder() {
-        button1.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                KeyGrabber.grabNextKey(spinner1);
-            }
-        });
-    }
-
-    private void setupMicrophones() {
+    private void populateMicrophoneCombo() {
 
         comboBox1.setRenderer(new ListCellRenderer() {
             @Override
@@ -109,25 +130,6 @@ public class AlterForm {
             comboBox1.addItem(mixer);
         }
 
-        try {
-            microphoneAnalyzer.setMixer(comboBox1.getItemAt(0));
-        } catch (LineUnavailableException e) {
-            e.printStackTrace();
-        }
-
-        comboBox1.addItemListener(new ItemListener() {
-            @Override
-            public void itemStateChanged(ItemEvent e) {
-                if (e.getStateChange() == ItemEvent.SELECTED) {
-                    Mixer.Info mixer = (Mixer.Info) e.getItem();
-                    try {
-                        microphoneAnalyzer.setMixer(mixer);
-                    } catch (LineUnavailableException e1) {
-                        e1.printStackTrace();
-                    }
-                }
-            }
-        });
     }
 
 
@@ -184,7 +186,7 @@ public class AlterForm {
             frame.pack();
             frame.setLocationRelativeTo(null);
             frame.setVisible(true);
-        } catch (AWTException e) {
+        } catch (Throwable e) {
             e.printStackTrace();
         }
 
