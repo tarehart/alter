@@ -1,5 +1,10 @@
 package tarehart.alter;
 
+import org.jnativehook.GlobalScreen;
+import org.jnativehook.NativeHookException;
+import org.jnativehook.keyboard.NativeKeyEvent;
+import org.jnativehook.keyboard.NativeKeyListener;
+
 import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.Mixer;
 import javax.swing.*;
@@ -15,11 +20,13 @@ import java.util.prefs.Preferences;
 public class AlterForm {
 
     private static final int MAX_VOLUME = 400;
-    private static final int GRACE_PERIOD = 500; // 1000 milliseconds = 1 second
+    private static final int LINGER_PERIOD = 500; // 1000 milliseconds = 1 second
     private static final int DEFAULT_THRESHOLD = 50;
     private static final String CONFIG_THRESHOLD = "threshold";
     private static final String CONFIG_KEY_CODE = "keyCode";
     private static final String CONFIG_MIC_CHOICE = "microphoneChoice";
+    private static final int SNEEZE_PERIOD = 5000; // 5000 milliseconds = 5 seconds
+    private static final String CONFIG_MUTE_CODE = "sneezeCode";
     private TalkingJudge judge;
     private KeyPresser presser;
     private MicrophoneAnalyzer microphoneAnalyzer;
@@ -31,7 +38,7 @@ public class AlterForm {
 
         microphoneAnalyzer = new MicrophoneAnalyzer();
         presser = new KeyPresser();
-        judge = new TalkingJudge(presser, GRACE_PERIOD);
+        judge = new TalkingJudge(presser, LINGER_PERIOD, SNEEZE_PERIOD);
 
         progressBar1.setMaximum(MAX_VOLUME);
         slider1.setMaximum(MAX_VOLUME);
@@ -42,6 +49,7 @@ public class AlterForm {
         setKeyFromUI();
 
         addUIListeners();
+        setSneezeHook();
 
         microphoneAnalyzer.addListener(new AmplitudeUpdateListener() {
             @Override
@@ -50,17 +58,52 @@ public class AlterForm {
                 progressBar1.setValue(level);
                 if (level >= slider1.getValue()) {
                     judge.gainSound();
-                    statusLight.setBackground(Color.green);
+                    pressingStatus.setBackground(Color.green);
                 } else {
                     judge.loseSound();
                 }
 
                 if (!judge.hearsTalking()) {
-                    statusLight.setBackground(Color.darkGray);
+                    pressingStatus.setBackground(Color.darkGray);
+                }
+
+                if (!judge.isMuted()) {
+                    muteStatus.setBackground(Color.darkGray);
                 }
             }
         });
 
+    }
+
+    private boolean setSneezeHook() {
+        try {
+            GlobalScreen.registerNativeHook();
+        }
+        catch (NativeHookException ex) {
+            System.err.println("There was a problem registering the sneeze hook.");
+            System.err.println(ex.getMessage());
+
+            return false;
+        }
+
+        //Construct the example object and initialze native hook.
+        GlobalScreen.getInstance().addNativeKeyListener(new NativeKeyListener() {
+            @Override
+            public void nativeKeyPressed(NativeKeyEvent nativeKeyEvent) {
+                if (nativeKeyEvent.getKeyCode() == (Integer) spinner2.getValue()) {
+                    judge.sneezeIncoming();
+                    muteStatus.setBackground(Color.green);
+                }
+            }
+
+            @Override
+            public void nativeKeyReleased(NativeKeyEvent nativeKeyEvent) { }
+
+            @Override
+            public void nativeKeyTyped(NativeKeyEvent nativeKeyEvent) { }
+        });
+
+        return true;
     }
 
     private void addUIListeners() {
@@ -86,6 +129,13 @@ public class AlterForm {
                 KeyGrabber.grabNextKey(spinner1);
             }
         });
+
+        sneezeSelect.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                KeyGrabber.grabNextKey(spinner2);
+            }
+        });
     }
 
     private void setKeyFromUI() {
@@ -104,12 +154,14 @@ public class AlterForm {
 
         slider1.setValue(preferences.getInt(CONFIG_THRESHOLD, DEFAULT_THRESHOLD));
         spinner1.setValue(preferences.getInt(CONFIG_KEY_CODE, KeyEvent.VK_ALT));
+        spinner2.setValue(preferences.getInt(CONFIG_MUTE_CODE, KeyEvent.VK_F5));
         comboBox1.setSelectedIndex(preferences.getInt(CONFIG_MIC_CHOICE, 0));
 
     }
 
     private void savePreferences() {
         preferences.putInt(CONFIG_KEY_CODE, (Integer) spinner1.getValue());
+        preferences.putInt(CONFIG_MUTE_CODE, (Integer) spinner2.getValue());
         preferences.putInt(CONFIG_THRESHOLD, slider1.getValue());
         preferences.putInt(CONFIG_MIC_CHOICE, comboBox1.getSelectedIndex());
     }
@@ -198,7 +250,10 @@ public class AlterForm {
     private JPanel rootPanel;
     private JButton button1;
     private JSpinner spinner1;
-    private JPanel statusLight;
+    private JPanel pressingStatus;
     private JComboBox<Mixer.Info> comboBox1;
     private JTextPane thisAppWillTakeTextPane;
+    private JButton sneezeSelect;
+    private JSpinner spinner2;
+    private JPanel muteStatus;
 }

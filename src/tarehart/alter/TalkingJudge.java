@@ -1,40 +1,55 @@
 package tarehart.alter;
 
 import javax.swing.*;
-import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
 public class TalkingJudge {
 
-    private int gracePeriod;
+    private int lingerTime;
+    private int sneezeTime;
     private KeyPresser presser;
-    private Timer timer;
+    private Timer lingerTimer;
+    private Timer sneezeTimer;
+    private boolean mutedForSneeze;
 
-    public TalkingJudge(KeyPresser presser, int gracePeriod) {
-        this.gracePeriod = gracePeriod;
+    public TalkingJudge(KeyPresser presser, int lingerTime, int sneezeTime) {
+        this.lingerTime = lingerTime;
         this.presser = presser;
+        this.sneezeTime = sneezeTime;
 
-        setupTimer();
+        setupTimers();
 
     }
 
-    private void setupTimer() {
-        timer = new Timer(gracePeriod, new ActionListener() {
+    private void setupTimers() {
+        lingerTimer = new Timer(lingerTime, new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 presser.release();
             }
         });
+        lingerTimer.setRepeats(false);
 
-        timer.setRepeats(false);
+        sneezeTimer = new Timer(sneezeTime, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                mutedForSneeze = false;
+            }
+        });
+        sneezeTimer.setRepeats(false);
     }
 
     public void gainSound() {
-        if (timer.isRunning()) {
-            timer.stop();
+
+        if (mutedForSneeze) {
+            sneezeTimer.restart();
         } else {
-            presser.beginHold();
+            if (lingerTimer.isRunning()) {
+                lingerTimer.stop();
+            } else {
+                presser.beginHold();
+            }
         }
     }
 
@@ -44,8 +59,8 @@ public class TalkingJudge {
             return;
         }
 
-        if (!timer.isRunning()) {
-            timer.restart();
+        if (!lingerTimer.isRunning()) {
+            lingerTimer.restart();
         }
     }
 
@@ -53,4 +68,17 @@ public class TalkingJudge {
         return presser.isPressing();
     }
 
+    public void sneezeIncoming() {
+        if (sneezeTimer.isRunning()) {
+            sneezeTimer.restart();
+        } else {
+            presser.release();
+            mutedForSneeze = true;
+            sneezeTimer.start();
+        }
+    }
+
+    public boolean isMuted() {
+        return mutedForSneeze;
+    }
 }
