@@ -34,7 +34,9 @@ public class MicrophoneAnalyzer {
         Mixer mixer = AudioSystem.getMixer(info);
         microphone = (TargetDataLine)mixer.getLine(AudioSystemHelper.targetDLInfo);
 
-        AudioFormat format = new AudioFormat(8000.0f, 8, 1, true, true);
+        // 1000 samples per second tends to exclude high-pitch noises like keyboard clacking
+        // and bad attempts at whistling. Also keeps CPU utilization low.
+        AudioFormat format = new AudioFormat(1000, 8, 1, true, true);
         microphone.open(format);
         microphone.start();
 
@@ -79,8 +81,8 @@ public class MicrophoneAnalyzer {
 
     class CaptureThread extends Thread{
 
-        //An arbitrary-size temporary holding buffer
-        byte tempBuffer[] = new byte[250];
+        //Small chunks for frequent amplitude updates
+        byte tempBuffer[] = new byte[20];
         public void run(){
 
             threadEnded = false;

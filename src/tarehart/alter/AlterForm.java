@@ -19,8 +19,8 @@ import java.util.prefs.Preferences;
 
 public class AlterForm {
 
-    private static final int MAX_VOLUME = 400;
-    private static final int LINGER_PERIOD = 500; // 1000 milliseconds = 1 second
+    private static final int MAX_VOLUME = 100;
+    private static final int LINGER_PERIOD = 800; // 1000 milliseconds = 1 second
     private static final int DEFAULT_THRESHOLD = 50;
     private static final String CONFIG_THRESHOLD = "threshold";
     private static final String CONFIG_KEY_CODE = "keyCode";
@@ -54,7 +54,7 @@ public class AlterForm {
         microphoneAnalyzer.addListener(new AmplitudeUpdateListener() {
             @Override
             public void amplitudeUpdated(float newAmplitude) {
-                int level = (int) newAmplitude * 10; // multiply by 10 so we get finer config with an int
+                int level = (int) (newAmplitude * 10); // multiply by 10 so we get finer config with an int
                 progressBar1.setValue(level);
                 if (level >= slider1.getValue()) {
                     judge.gainSound();
