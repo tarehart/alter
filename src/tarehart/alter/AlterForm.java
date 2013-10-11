@@ -12,6 +12,8 @@ import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import java.awt.*;
 import java.awt.event.*;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.net.URL;
 import java.util.List;
 import java.util.prefs.Preferences;
@@ -29,14 +31,15 @@ public class AlterForm {
     private static final String CONFIG_MUTE_CODE = "sneezeCode";
     private TalkingJudge judge;
     private KeyPresser presser;
-    private MicrophoneAnalyzer microphoneAnalyzer;
     protected Preferences preferences = Preferences.userNodeForPackage(AlterForm.class);
+    private NativeKeyListener sneezeListener;
+    private int noiseLevel;
+    private SwingWorker microphoneWorker;
 
     public AlterForm() throws AWTException {
 
         populateMicrophoneCombo();
 
-        microphoneAnalyzer = new MicrophoneAnalyzer();
         presser = new KeyPresser();
         judge = new TalkingJudge(presser, LINGER_PERIOD, SNEEZE_PERIOD);
 
@@ -51,28 +54,46 @@ public class AlterForm {
         addUIListeners();
         setSneezeHook();
 
-        microphoneAnalyzer.addListener(new AmplitudeUpdateListener() {
+        goToGameModeButton.addActionListener(new ActionListener() {
             @Override
-            public void amplitudeUpdated(float newAmplitude) {
-                int level = (int) (newAmplitude * 10); // multiply by 10 so we get finer config with an int
-                progressBar1.setValue(level);
-                if (level >= slider1.getValue()) {
-                    judge.gainSound();
-                    pressingStatus.setBackground(Color.green);
-                } else {
-                    judge.loseSound();
-                }
+            public void actionPerformed(ActionEvent e) {
+                configPanel.setVisible(false);
+                rootPanel.remove(configPanel);
+            }
+        });
+    }
 
-                if (!judge.hearsTalking()) {
-                    pressingStatus.setBackground(Color.darkGray);
-                }
+    private void initMicrophoneWorker(Mixer.Info mixer) throws LineUnavailableException {
+        microphoneWorker = MicrophoneWorkerFactory.createMicrophoneWorker(mixer);
 
-                if (!judge.isMuted()) {
-                    muteStatus.setBackground(Color.darkGray);
+        microphoneWorker.addPropertyChangeListener(new PropertyChangeListener() {
+            @Override
+            public void propertyChange(PropertyChangeEvent evt) {
+                if ("progress".equals(evt.getPropertyName())) {
+                    noiseLevel = (Integer) evt.getNewValue();
+
+                    progressBar1.setValue(noiseLevel);
+
+                    if (noiseLevel >= slider1.getValue()) {
+                        judge.gainSound();
+                        pressingStatus.setBackground(Color.green);
+
+                    } else {
+                        judge.loseSound();
+                    }
+
+                    if (!judge.hearsTalking()) {
+                        pressingStatus.setBackground(Color.darkGray);
+                    }
+
+                    if (!judge.isMuted()) {
+                        muteStatus.setBackground(Color.darkGray);
+                    }
                 }
             }
         });
 
+        microphoneWorker.execute();
     }
 
     private boolean setSneezeHook() {
@@ -86,8 +107,7 @@ public class AlterForm {
             return false;
         }
 
-        //Construct the example object and initialze native hook.
-        GlobalScreen.getInstance().addNativeKeyListener(new NativeKeyListener() {
+        sneezeListener = new NativeKeyListener() {
             @Override
             public void nativeKeyPressed(NativeKeyEvent nativeKeyEvent) {
                 if (nativeKeyEvent.getKeyCode() == (Integer) spinner2.getValue()) {
@@ -101,9 +121,15 @@ public class AlterForm {
 
             @Override
             public void nativeKeyTyped(NativeKeyEvent nativeKeyEvent) { }
-        });
+        };
+
+        GlobalScreen.getInstance().addNativeKeyListener(sneezeListener);
 
         return true;
+    }
+
+    private void releaseSneezeHook() {
+        GlobalScreen.getInstance().removeNativeKeyListener(sneezeListener);
     }
 
     private void addUIListeners() {
@@ -144,7 +170,10 @@ public class AlterForm {
 
     private void setMicrophoneFromUI() {
         try {
-            microphoneAnalyzer.setMixer((Mixer.Info) comboBox1.getSelectedItem());
+            if (microphoneWorker != null) {
+                microphoneWorker.cancel(true);
+            }
+            initMicrophoneWorker((Mixer.Info) comboBox1.getSelectedItem());
         } catch (LineUnavailableException e) {
             e.printStackTrace();
         }
@@ -168,12 +197,11 @@ public class AlterForm {
 
     private void populateMicrophoneCombo() {
 
-        comboBox1.setRenderer(new ListCellRenderer() {
+        comboBox1.setRenderer(new ListCellRenderer<Mixer.Info>() {
             @Override
-            public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+            public Component getListCellRendererComponent(JList list, Mixer.Info value, int index, boolean isSelected, boolean cellHasFocus) {
                 DefaultListCellRenderer renderer = new DefaultListCellRenderer();
-                Mixer.Info mixer = (Mixer.Info) value;
-                return renderer.getListCellRendererComponent(list, mixer.getName(), index, isSelected, cellHasFocus);
+                return renderer.getListCellRendererComponent(list, value.getName(), index, isSelected, cellHasFocus);
             }
         });
 
@@ -193,8 +221,9 @@ public class AlterForm {
             @Override
             public void windowClosing(WindowEvent e) {
 
-                microphoneAnalyzer.stop();
+                microphoneWorker.cancel(true);
                 presser.release();
+                releaseSneezeHook();
 
                 savePreferences();
             }
@@ -256,4 +285,9 @@ public class AlterForm {
     private JButton sneezeSelect;
     private JSpinner spinner2;
     private JPanel muteStatus;
+    private JButton goToGameModeButton;
+    private JCheckBox startInGameModeCheckBox;
+    private JPanel configPanel;
+    private JTabbedPane tabbedPane1;
+    private JPanel gameMode;
 }
