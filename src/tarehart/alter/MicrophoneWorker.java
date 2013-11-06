@@ -28,6 +28,8 @@ public class MicrophoneWorker extends SwingWorker {
                 int bytesRead = microphone.read(tempBuffer, 0, tempBuffer.length);
                 if (bytesRead > 0) {
                     int currentLevel = (int) (calculateRMSLevel(tempBuffer) * 10);
+                    if (currentLevel > 100) currentLevel = 100;
+                    if (currentLevel < 0) currentLevel = 0;
                     setProgress(currentLevel);
                 }
 
