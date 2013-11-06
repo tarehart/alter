@@ -73,6 +73,9 @@ public class AlterForm {
                 if ("progress".equals(evt.getPropertyName())) {
                     noiseLevel = (Integer) evt.getNewValue();
 
+                    if (noiseLevel < progressBar1.getMinimum()) noiseLevel = progressBar1.getMinimum();
+                    if (noiseLevel > progressBar1.getMaximum()) noiseLevel = progressBar1.getMaximum();
+
                     progressBar1.setValue(noiseLevel);
 
                     if (noiseLevel >= slider1.getValue()) {
@@ -286,10 +289,14 @@ public class AlterForm {
             public void windowDeiconified(WindowEvent e) { }
 
             @Override
-            public void windowActivated(WindowEvent e) { }
+            public void windowActivated(WindowEvent e) {
+                rootPanel.setVisible(true);
+            }
 
             @Override
-            public void windowDeactivated(WindowEvent e) { }
+            public void windowDeactivated(WindowEvent e) {
+                rootPanel.setVisible(false);
+            }
         };
     }
 

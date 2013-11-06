@@ -157,7 +157,7 @@
                   </grid>
                 </constraints>
                 <properties>
-                  <background color="-13421773"/>
+                  <background awt-color="darkGray"/>
                 </properties>
                 <border type="none"/>
                 <children/>
@@ -199,7 +199,7 @@
                   </grid>
                 </constraints>
                 <properties>
-                  <background color="-13421773"/>
+                  <background awt-color="darkGray"/>
                 </properties>
                 <border type="none"/>
                 <children/>
@@ -236,7 +236,7 @@
                   </grid>
                 </constraints>
                 <properties>
-                  <background color="-13421773"/>
+                  <background awt-color="darkGray"/>
                 </properties>
                 <border type="none"/>
                 <children/>

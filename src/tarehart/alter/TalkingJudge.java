@@ -36,6 +36,9 @@ public class TalkingJudge {
             @Override
             public void actionPerformed(ActionEvent e) {
                 mutedForSneeze = false;
+                if (!isManuallyMuted()) {
+                    SoundPlayer.boop();
+                }
             }
         });
         sneezeTimer.setRepeats(false);
@@ -77,7 +80,7 @@ public class TalkingJudge {
         if (sneezeTimer.isRunning()) {
             sneezeTimer.restart();
         } else {
-            presser.release();
+            engageMute();
             mutedForSneeze = true;
             sneezeTimer.start();
         }
@@ -87,11 +90,19 @@ public class TalkingJudge {
         if (!mutedManually) {
             mutedManually = true;
             mutedForSneeze = false;
-            presser.release();
+            engageMute();
             sneezeTimer.stop();
         } else {
             mutedManually = false;
+            if (!isMutedForSneeze()) {
+                SoundPlayer.boop();
+            }
         }
+    }
+
+    private void engageMute() {
+        presser.release();
+        SoundPlayer.beepBeep();
     }
 
     public boolean isManuallyMuted() {
