@@ -28,11 +28,13 @@ public class AlterForm {
     private static final String CONFIG_KEY_CODE = "keyCode";
     private static final String CONFIG_MIC_CHOICE = "microphoneChoice";
     private static final int SNEEZE_PERIOD = 5000; // 5000 milliseconds = 5 seconds
-    private static final String CONFIG_MUTE_CODE = "sneezeCode";
+    private static final String CONFIG_SNEEZE_CODE = "sneezeCode";
+    private static final String CONFIG_MUTE_CODE = "muteCode";
     private TalkingJudge judge;
     private KeyPresser presser;
     protected Preferences preferences = Preferences.userNodeForPackage(AlterForm.class);
     private NativeKeyListener sneezeListener;
+    private NativeKeyListener muteListener;
     private int noiseLevel;
     private SwingWorker microphoneWorker;
 
@@ -48,22 +50,21 @@ public class AlterForm {
 
         setUIFromPreferences();
 
-        setMicrophoneFromUI();
+        try {
+            setMicrophoneFromUI();
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(rootPanel, "This microphone isn't working at the moment. Picking a different one or restarting the program might work.");
+        }
+
         setKeyFromUI();
 
         addUIListeners();
         setSneezeHook();
 
-        goToGameModeButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                configPanel.setVisible(false);
-                rootPanel.remove(configPanel);
-            }
-        });
     }
 
-    private void initMicrophoneWorker(Mixer.Info mixer) throws LineUnavailableException {
+    private void initMicrophoneWorker(Mixer.Info mixer) throws LineUnavailableException, IllegalArgumentException {
         microphoneWorker = MicrophoneWorkerFactory.createMicrophoneWorker(mixer);
 
         microphoneWorker.addPropertyChangeListener(new PropertyChangeListener() {
@@ -86,8 +87,8 @@ public class AlterForm {
                         pressingStatus.setBackground(Color.darkGray);
                     }
 
-                    if (!judge.isMuted()) {
-                        muteStatus.setBackground(Color.darkGray);
+                    if (!judge.isMutedForSneeze()) {
+                        sneezeStatus.setBackground(Color.darkGray);
                     }
                 }
             }
@@ -112,7 +113,27 @@ public class AlterForm {
             public void nativeKeyPressed(NativeKeyEvent nativeKeyEvent) {
                 if (nativeKeyEvent.getKeyCode() == (Integer) spinner2.getValue()) {
                     judge.sneezeIncoming();
-                    muteStatus.setBackground(Color.green);
+                    sneezeStatus.setBackground(Color.green);
+                }
+            }
+
+            @Override
+            public void nativeKeyReleased(NativeKeyEvent nativeKeyEvent) { }
+
+            @Override
+            public void nativeKeyTyped(NativeKeyEvent nativeKeyEvent) { }
+        };
+
+        muteListener = new NativeKeyListener() {
+            @Override
+            public void nativeKeyPressed(NativeKeyEvent nativeKeyEvent) {
+                if (nativeKeyEvent.getKeyCode() == (Integer) muteKeySpinner.getValue()) {
+                    judge.toggleManualMute();
+                    if (judge.isManuallyMuted()) {
+                        muteStatus.setBackground(Color.green);
+                    } else {
+                        muteStatus.setBackground(Color.darkGray);
+                    }
                 }
             }
 
@@ -124,6 +145,8 @@ public class AlterForm {
         };
 
         GlobalScreen.getInstance().addNativeKeyListener(sneezeListener);
+
+        GlobalScreen.getInstance().addNativeKeyListener(muteListener);
 
         return true;
     }
@@ -144,7 +167,13 @@ public class AlterForm {
             @Override
             public void itemStateChanged(ItemEvent e) {
                 if (e.getStateChange() == ItemEvent.SELECTED) {
-                    setMicrophoneFromUI();
+                    try {
+                        setMicrophoneFromUI();
+                    } catch (LineUnavailableException e1) {
+                        e1.printStackTrace();
+                    } catch (IllegalArgumentException e2) {
+                        e2.printStackTrace();
+                    }
                 }
             }
         });
@@ -153,6 +182,13 @@ public class AlterForm {
             @Override
             public void actionPerformed(ActionEvent e) {
                 KeyGrabber.grabNextKey(spinner1);
+            }
+        });
+
+        selectMuteKeyButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                KeyGrabber.grabNextKey(muteKeySpinner);
             }
         });
 
@@ -168,34 +204,47 @@ public class AlterForm {
         presser.setKey((Integer) spinner1.getValue());
     }
 
-    private void setMicrophoneFromUI() {
-        try {
-            if (microphoneWorker != null) {
-                microphoneWorker.cancel(true);
-            }
-            initMicrophoneWorker((Mixer.Info) comboBox1.getSelectedItem());
-        } catch (LineUnavailableException e) {
-            e.printStackTrace();
+    private void setMicrophoneFromUI() throws IllegalArgumentException, LineUnavailableException {
+
+        if (microphoneWorker != null) {
+            microphoneWorker.cancel(true);
         }
+        initMicrophoneWorker((Mixer.Info) comboBox1.getSelectedItem());
+
     }
 
     private void setUIFromPreferences() {
 
         slider1.setValue(preferences.getInt(CONFIG_THRESHOLD, DEFAULT_THRESHOLD));
         spinner1.setValue(preferences.getInt(CONFIG_KEY_CODE, KeyEvent.VK_ALT));
-        spinner2.setValue(preferences.getInt(CONFIG_MUTE_CODE, KeyEvent.VK_F5));
-        comboBox1.setSelectedIndex(preferences.getInt(CONFIG_MIC_CHOICE, 0));
+        spinner2.setValue(preferences.getInt(CONFIG_SNEEZE_CODE, KeyEvent.VK_PAGE_DOWN));
+        muteKeySpinner.setValue(preferences.getInt(CONFIG_MUTE_CODE, KeyEvent.VK_PAGE_UP));
+        if (comboBox1.getItemCount() > 0) {
+            comboBox1.setSelectedIndex(preferences.getInt(CONFIG_MIC_CHOICE, 0));
+        }
 
     }
 
     private void savePreferences() {
         preferences.putInt(CONFIG_KEY_CODE, (Integer) spinner1.getValue());
-        preferences.putInt(CONFIG_MUTE_CODE, (Integer) spinner2.getValue());
+        preferences.putInt(CONFIG_SNEEZE_CODE, (Integer) spinner2.getValue());
+        preferences.putInt(CONFIG_MUTE_CODE, (Integer) muteKeySpinner.getValue());
         preferences.putInt(CONFIG_THRESHOLD, slider1.getValue());
         preferences.putInt(CONFIG_MIC_CHOICE, comboBox1.getSelectedIndex());
     }
 
     private void populateMicrophoneCombo() {
+
+        List<Mixer.Info> mixers = AudioSystemHelper.ListAudioInputDevices();
+        for (Mixer.Info mixer: mixers) {
+            comboBox1.addItem(mixer);
+        }
+
+        if (comboBox1.getItemCount() == 0) {
+
+            failForMissingMic();
+
+        }
 
         comboBox1.setRenderer(new ListCellRenderer<Mixer.Info>() {
             @Override
@@ -204,12 +253,11 @@ public class AlterForm {
                 return renderer.getListCellRendererComponent(list, value.getName(), index, isSelected, cellHasFocus);
             }
         });
+    }
 
-        List<Mixer.Info> mixers = AudioSystemHelper.ListAudioInputDevices();
-        for (Mixer.Info mixer: mixers) {
-            comboBox1.addItem(mixer);
-        }
-
+    private void failForMissingMic() {
+        JOptionPane.showMessageDialog(rootPanel, "No microphone detected. Please plug one in, wait ~20 seconds, and try again.");
+        System.exit(-1);
     }
 
 
@@ -254,19 +302,24 @@ public class AlterForm {
         } catch (Exception e) {
             // Essen
         }
-        JFrame frame = new JFrame("Alt'er");
+        JFrame frame = new JFrame("Talk to Push");
         URL url = ClassLoader.getSystemResource("tarehart/alter/resources/alter.png");
         Image img = Toolkit.getDefaultToolkit().createImage(url);
         frame.setIconImage(img);
 
         try {
             AlterForm m = new AlterForm();
+            //BorderForm b = new BorderForm();
             frame.setContentPane(m.rootPanel);
+            //frame.setContentPane(b.panel1);
             frame.addWindowListener(m.getWindowListener());
             frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
             frame.pack();
             frame.setLocationRelativeTo(null);
             frame.setVisible(true);
+
+
+
         } catch (Throwable e) {
             e.printStackTrace();
         }
@@ -284,10 +337,10 @@ public class AlterForm {
     private JTextPane thisAppWillTakeTextPane;
     private JButton sneezeSelect;
     private JSpinner spinner2;
-    private JPanel muteStatus;
+    private JPanel sneezeStatus;
     private JButton goToGameModeButton;
-    private JCheckBox startInGameModeCheckBox;
     private JPanel configPanel;
-    private JTabbedPane tabbedPane1;
-    private JPanel gameMode;
+    private JButton selectMuteKeyButton;
+    private JSpinner muteKeySpinner;
+    private JPanel muteStatus;
 }

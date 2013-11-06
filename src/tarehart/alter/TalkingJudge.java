@@ -12,6 +12,7 @@ public class TalkingJudge {
     private Timer lingerTimer;
     private Timer sneezeTimer;
     private boolean mutedForSneeze;
+    private boolean mutedManually;
 
     public TalkingJudge(KeyPresser presser, int lingerTime, int sneezeTime) {
         this.lingerTime = lingerTime;
@@ -41,6 +42,10 @@ public class TalkingJudge {
     }
 
     public void gainSound() {
+
+        if (mutedManually) {
+            return;
+        }
 
         if (mutedForSneeze) {
             sneezeTimer.restart();
@@ -78,7 +83,22 @@ public class TalkingJudge {
         }
     }
 
-    public boolean isMuted() {
+    public void toggleManualMute() {
+        if (!mutedManually) {
+            mutedManually = true;
+            mutedForSneeze = false;
+            presser.release();
+            sneezeTimer.stop();
+        } else {
+            mutedManually = false;
+        }
+    }
+
+    public boolean isManuallyMuted() {
+        return mutedManually;
+    }
+
+    public boolean isMutedForSneeze() {
         return mutedForSneeze;
     }
 }
