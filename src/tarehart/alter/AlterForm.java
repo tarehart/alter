@@ -30,6 +30,8 @@ public class AlterForm {
     private static final int SNEEZE_PERIOD = 5000; // 5000 milliseconds = 5 seconds
     private static final String CONFIG_SNEEZE_CODE = "sneezeCode";
     private static final String CONFIG_MUTE_CODE = "muteCode";
+    public static final String CONFIG_SAMPLE_CODE = "sampleCode";
+    public static final int DEFAULT_SAMPLE = 8;
     private TalkingJudge judge;
     private KeyPresser presser;
     protected Preferences preferences = Preferences.userNodeForPackage(AlterForm.class);
@@ -64,8 +66,19 @@ public class AlterForm {
 
     }
 
-    private void initMicrophoneWorker(Mixer.Info mixer) throws LineUnavailableException, IllegalArgumentException {
-        microphoneWorker = MicrophoneWorkerFactory.createMicrophoneWorker(mixer);
+    private void initMicrophoneWorker(Mixer.Info mixer, int sampleSize) throws LineUnavailableException, IllegalArgumentException {
+
+        if (microphoneWorker != null) {
+            microphoneWorker.cancel(true);
+        }
+
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        microphoneWorker = MicrophoneWorkerFactory.createMicrophoneWorker(mixer, sampleSize);
 
         microphoneWorker.addPropertyChangeListener(new PropertyChangeListener() {
             @Override
@@ -201,6 +214,20 @@ public class AlterForm {
                 KeyGrabber.grabNextKey(spinner2);
             }
         });
+
+        final ActionListener sampleSizeHandler = new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                try {
+                    setMicrophoneFromUI();
+                } catch (LineUnavailableException e1) {
+                    e1.printStackTrace();
+                }
+            }
+        };
+
+        bit8.addActionListener(sampleSizeHandler);
+        bit16.addActionListener(sampleSizeHandler);
     }
 
     private void setKeyFromUI() {
@@ -212,8 +239,18 @@ public class AlterForm {
         if (microphoneWorker != null) {
             microphoneWorker.cancel(true);
         }
-        initMicrophoneWorker((Mixer.Info) comboBox1.getSelectedItem());
 
+        int sampleSize = getSelectedSampleSize();
+        initMicrophoneWorker((Mixer.Info) comboBox1.getSelectedItem(), sampleSize);
+
+    }
+
+    private int getSelectedSampleSize() {
+        int sampleSize = 8;
+        if (bit16.isSelected()) {
+            sampleSize = 16;
+        }
+        return sampleSize;
     }
 
     private void setUIFromPreferences() {
@@ -225,6 +262,9 @@ public class AlterForm {
         if (comboBox1.getItemCount() > 0) {
             comboBox1.setSelectedIndex(preferences.getInt(CONFIG_MIC_CHOICE, 0));
         }
+        if (preferences.getInt(CONFIG_SAMPLE_CODE, DEFAULT_SAMPLE) == 16) {
+            bit16.setSelected(true);
+        }
 
     }
 
@@ -234,6 +274,7 @@ public class AlterForm {
         preferences.putInt(CONFIG_MUTE_CODE, (Integer) muteKeySpinner.getValue());
         preferences.putInt(CONFIG_THRESHOLD, slider1.getValue());
         preferences.putInt(CONFIG_MIC_CHOICE, comboBox1.getSelectedIndex());
+        preferences.putInt(CONFIG_SAMPLE_CODE, getSelectedSampleSize());
     }
 
     private void populateMicrophoneCombo() {
@@ -345,9 +386,10 @@ public class AlterForm {
     private JButton sneezeSelect;
     private JSpinner spinner2;
     private JPanel sneezeStatus;
-    private JButton goToGameModeButton;
     private JPanel configPanel;
     private JButton selectMuteKeyButton;
     private JSpinner muteKeySpinner;
     private JPanel muteStatus;
+    private JRadioButton bit8;
+    private JRadioButton bit16;
 }
