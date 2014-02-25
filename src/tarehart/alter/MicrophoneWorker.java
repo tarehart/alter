@@ -48,6 +48,11 @@ public class MicrophoneWorker extends SwingWorker {
         return null;
     }
 
+    public void shutdown() {
+        microphone.close();
+        cancel(true);
+    }
+
     private static float calculateRMSLevel(byte[] audioData) {
         // audioData might be buffered data read from a data line
         long sum = 0;

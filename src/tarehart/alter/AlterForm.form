@@ -248,6 +248,7 @@
                 <properties>
                   <selected value="true"/>
                   <text value="8 bit"/>
+                  <toolTipText value="The original sample size from previous versions."/>
                 </properties>
               </component>
               <component id="bb14d" class="javax.swing.JRadioButton" binding="bit16">
@@ -256,6 +257,7 @@
                 </constraints>
                 <properties>
                   <text value="16 bit"/>
+                  <toolTipText value="A larger sample size that will work much better for some people."/>
                 </properties>
               </component>
               <component id="2b794" class="javax.swing.JLabel">
@@ -264,14 +266,6 @@
                 </constraints>
                 <properties>
                   <text value="Sample size"/>
-                </properties>
-              </component>
-              <component id="638a7" class="javax.swing.JLabel">
-                <constraints>
-                  <grid row="3" column="3" row-span="1" col-span="4" vsize-policy="0" hsize-policy="0" anchor="8" fill="0" indent="0" use-parent-layout="false"/>
-                </constraints>
-                <properties>
-                  <text value="Whichever works better for you"/>
                 </properties>
               </component>
             </children>

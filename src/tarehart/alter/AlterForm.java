@@ -38,7 +38,8 @@ public class AlterForm {
     private NativeKeyListener sneezeListener;
     private NativeKeyListener muteListener;
     private int noiseLevel;
-    private SwingWorker microphoneWorker;
+    private MicrophoneWorker microphoneWorker;
+    private DeadMicDetector deadMicDetector;
 
     public AlterForm() throws AWTException {
 
@@ -46,6 +47,21 @@ public class AlterForm {
 
         presser = new KeyPresser();
         judge = new TalkingJudge(presser, LINGER_PERIOD, SNEEZE_PERIOD);
+        deadMicDetector = new DeadMicDetector();
+        deadMicDetector.addEventListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                try {
+                    progressBar1.setValue(0);
+                    setMicrophoneFromUI();
+
+                } catch (LineUnavailableException e1) {
+                    e1.printStackTrace();
+                } finally {
+                    deadMicDetector.lookAlive();
+                }
+            }
+        });
 
         progressBar1.setMaximum(MAX_VOLUME);
         slider1.setMaximum(MAX_VOLUME);
@@ -69,13 +85,13 @@ public class AlterForm {
     private void initMicrophoneWorker(Mixer.Info mixer, int sampleSize) throws LineUnavailableException, IllegalArgumentException {
 
         if (microphoneWorker != null) {
-            microphoneWorker.cancel(true);
-        }
+            microphoneWorker.shutdown();
 
-        try {
-            Thread.sleep(500);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
 
         microphoneWorker = MicrophoneWorkerFactory.createMicrophoneWorker(mixer, sampleSize);
@@ -106,6 +122,8 @@ public class AlterForm {
                     if (!judge.isMutedForSneeze()) {
                         sneezeStatus.setBackground(Color.darkGray);
                     }
+
+                    deadMicDetector.lookAlive();
                 }
             }
         });
@@ -236,10 +254,6 @@ public class AlterForm {
 
     private void setMicrophoneFromUI() throws IllegalArgumentException, LineUnavailableException {
 
-        if (microphoneWorker != null) {
-            microphoneWorker.cancel(true);
-        }
-
         int sampleSize = getSelectedSampleSize();
         initMicrophoneWorker((Mixer.Info) comboBox1.getSelectedItem(), sampleSize);
 
@@ -313,7 +327,7 @@ public class AlterForm {
             @Override
             public void windowClosing(WindowEvent e) {
 
-                microphoneWorker.cancel(true);
+                microphoneWorker.shutdown();
                 presser.release();
                 releaseSneezeHook();
 
